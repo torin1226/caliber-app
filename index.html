@@ -2230,7 +2230,8 @@ var CaliberCore = (function () {
       '',
       '1. First, ask me what I want to fix or add, and confirm the scope is: ' + scopeLine + '.',
       '2. Keep the original intent, dimension names, and structure unless I explicitly ask to change them.',
-      '3. Ask a few targeted questions, then return the updated rubric as JSON in exactly the same shape (name, levelCount, levelLabels, dimensions[].levels[].descriptor) inside a ```json code block. Put nothing else inside the block.',
+      '3. Before returning anything, run an HR check on the updated content. My team reads this rubric verbatim in their self-assessment, so every dimension and descriptor must be professional, job-related, and behavioral. Remove or rewrite anything that touches a protected class under US law (race, color, religion, sex, sexual orientation, gender identity, national origin, age, disability, genetic information, pregnancy, veteran status) or a proxy for one, anything discriminatory, and anything that reads as a personality judgment or personal criticism rather than observable work behavior. Tell me briefly if you changed anything and why.',
+      '4. Ask a few targeted questions, then return the updated rubric as JSON in exactly the same shape (name, levelCount, levelLabels, dimensions[].levels[].descriptor) inside a ```json code block. Put nothing else inside the block.',
       '',
       JSON.stringify(clean, null, 2)
     ].join('\n');
@@ -4059,17 +4060,22 @@ function buildAuthoringPrompt() {
   var labels = defaultLevelLabels(n);
   var ctx = authoringInput.context.trim();
   var lines = [
-    'You are helping a manager build a skills rubric for ' + role + '. Work through THREE steps in order. Do not skip ahead, and do not output the final JSON until Step 3.',
+    'I am a manager, and you are helping me build a skills rubric for ' + role + '.',
+    '',
+    'Context so you know exactly what this is for: I use Caliber, a small local-first app for ordinary career development. Each person on my team rates THEMSELVES against this rubric, I rate them too, and the two of us compare notes in a 1:1 — the gap between our ratings is the conversation starter. The rubric you write will be shown verbatim and openly to my team members during their self-assessment. This is a routine, transparent management exercise; nothing here is covert or aimed at anyone.',
+    '',
+    'Work through FIVE steps in order. Do not skip ahead, and do not output the final JSON until Step 5.',
     '',
     'STEP 1 — Check for existing material.',
-    'Before anything else, ask the manager a single question: do they already have a skills matrix, leveling guide, competency framework, career ladder, or job description for this role that they can paste in?',
-    '- If they share one, build the rubric\'s dimensions and level descriptors on top of it — keep their language and structure, and use Step 2 only to fill gaps and confirm.',
-    '- If they don\'t have one, build the rubric from their Step 2 answers.',
-    'Ask this first and wait for their reply before continuing.',
+    'Before anything else, ask me a single question: do I already have a skills matrix, leveling guide, competency framework, career ladder, or job description for this role that I can paste in?',
+    '- If I share one, build the rubric\'s dimensions and level descriptors on top of it — keep its language and structure, and use Step 2 only to fill gaps and confirm.',
+    '- If I don\'t have one, build the rubric from my Step 2 answers.',
+    'Ask this first and wait for my reply before continuing.',
     '',
-    'STEP 2 — Ask a short quiz using the in-chat interactive option picker.',
-    'Use your native tappable multiple-choice questions (the ask_user_input tool), NOT a separate JSX/HTML artifact or app. Ask 10 to 15 questions, a few at a time. For open-ended questions, still present them through the picker with a few example options plus a free-text "Other" choice so the manager can answer in their own words.',
-    'The questions exist to capture THIS team\'s criteria — what they actually want to measure and reward. Cover things like:',
+    'STEP 2 — Ask me a short quiz using the in-chat interactive option picker.',
+    'Use your native tappable multiple-choice questions (the ask_user_input tool), NOT a separate JSX/HTML artifact or app. To be clear about WHY: the picker is purely a convenience so I can answer a dozen questions by tapping options instead of typing paragraphs — the questions are ordinary "what does your team value" questions, and there is nothing sensitive about the mechanism. If the picker is unavailable, just ask the same questions as plain numbered text and I will answer in a message.',
+    'Ask 10 to 15 questions, a few at a time. For open-ended questions, still present them through the picker with a few example options plus a free-text "Other" choice so I can answer in my own words.',
+    'The questions exist to capture THIS team\'s criteria — what we actually want to measure and reward. Cover things like:',
     '- Which skill areas matter most for this role (you will turn the chosen ones into the ' + d + ' dimensions).',
     '- What "great" looks like day-to-day, in the team\'s own words.',
     '- How the team separates a higher level from a lower one — scope, autonomy, ambiguity, and impact expectations.',
@@ -4078,12 +4084,26 @@ function buildAuthoringPrompt() {
     'Keep each question tight and concrete, and prefer pick-an-option over write-an-essay.'
   ];
   if (ctx) {
-    lines.push('The manager already told Caliber this about the team — fold it into the questions instead of re-asking it: ' + ctx);
+    lines.push('I already told Caliber this about the team — fold it into the questions instead of re-asking it: ' + ctx);
   }
-  lines.push('Wait for the manager to answer before continuing.');
+  lines.push('Wait for me to answer before continuing.');
   lines.push('');
-  lines.push('STEP 3 — Deliver the rubric.');
-  lines.push('Only after you have their answers (and their existing doc, if they shared one), produce the rubric as a JSON object in EXACTLY this shape:');
+  lines.push('STEP 3 — Review the draft with me BEFORE writing any JSON.');
+  lines.push('Draft the rubric internally from my answers, then walk me through it at a high level:');
+  lines.push('- List the ' + d + ' dimensions you chose, each with a one-sentence plain-language summary of what it measures and why it fits this team.');
+  lines.push('- Then ask me 2-3 final questions to make sure the rubric feels custom-built rather than generic — for example: is any important skill missing or any dimension not worth measuring? should any dimension be renamed into words my team actually uses? which one or two dimensions matter most, so their descriptors get the most care?');
+  lines.push('Adjust the draft based on my answers before moving on. Wait for my reply.');
+  lines.push('');
+  lines.push('STEP 4 — Run an HR check on the final content.');
+  lines.push('Remember: my team members read every dimension name, description, and level descriptor verbatim in their self-assessment. Before delivering, review the whole rubric and fix anything that should not be put in front of an employee:');
+  lines.push('- Nothing that touches, or acts as a proxy for, a protected class under US employment law: race, color, religion, sex, sexual orientation, gender identity, national origin, age, disability, genetic information, pregnancy, or veteran status. (Watch for sneaky proxies like "digital native", "high energy", "culture fit" as personality, or fluency requirements the job does not actually need.)');
+  lines.push('- Nothing discriminatory, and no criteria a lawyer would flag as inviting bias.');
+  lines.push('- No personality judgments or personal criticism — every criterion must be job-related, professional, and describe observable work behavior.');
+  lines.push('- Tone check: everything should read as respectful and growth-oriented to the person rating themselves.');
+  lines.push('If you change anything in this step, tell me briefly what and why.');
+  lines.push('');
+  lines.push('STEP 5 — Deliver the rubric.');
+  lines.push('Only after Steps 1-4, produce the rubric as a JSON object in EXACTLY this shape:');
   lines.push('');
   lines.push('{');
   lines.push('  "name": "' + (role.length < 40 ? role.replace(/^an? /, '') : 'Custom') + ' rubric",');
@@ -4104,19 +4124,19 @@ function buildAuthoringPrompt() {
   lines.push('}');
   lines.push('');
   lines.push('Deliver it BOTH ways so it is easy to get into Caliber:');
-  lines.push('1. Save it as a downloadable file named "caliber-rubric.json" the manager can download in one click.');
-  lines.push('2. Also paste the exact same JSON inline in a ```json code block, so they can copy it straight from the chat if they prefer.');
+  lines.push('1. Save it as a downloadable file named "caliber-rubric.json" I can download in one click.');
+  lines.push('2. Also paste the exact same JSON inline in a ```json code block, so I can copy it straight from the chat if I prefer.');
   lines.push('Put nothing else inside the JSON or the code block — no comments, no trailing notes.');
   lines.push('');
   lines.push('Requirements for the JSON:');
   lines.push('- Exactly ' + d + ' dimensions, each with exactly ' + n + ' levels using these labels in order: ' + labels.join(', ') + '.');
-  lines.push('- Ground every dimension and descriptor in the manager\'s quiz answers and existing doc — this rubric should read like THIS team wrote it, not a generic template.');
+  lines.push('- Ground every dimension and descriptor in my quiz answers, my Step 3 feedback, and my existing doc — this rubric should read like THIS team wrote it, not a generic template.');
   lines.push('- Descriptors must be ORIGINAL, concrete, and behavioral — describe observable actions ("proactively pulls in the right people"), not vague adjectives ("is great at collaboration").');
   lines.push('- Every dimension gets a "notePrompt": vary them — mix "give a recent example" asks with "what support would help you grow here" asks, phrased for the person rating THEMSELVES.');
   lines.push('- Each level must read as a clear step up from the one before it, and be written so BOTH a manager and the person themselves could honestly pick it.');
   lines.push('- Plain language, no corporate jargon.');
   lines.push('');
-  lines.push('Recap: Step 1 ask about an existing doc, Step 2 a quick in-chat multiple-choice quiz (no separate form), Step 3 deliver the JSON as a downloadable file AND a code block — only after the manager has answered.');
+  lines.push('Recap: Step 1 ask about an existing doc, Step 2 a quick in-chat multiple-choice quiz (no separate form), Step 3 review the dimensions with me and ask 2-3 final customizing questions, Step 4 HR-check every word my team will see, Step 5 deliver the JSON as a downloadable file AND a code block — only after I have answered.');
   return lines.join('\n');
 }
 views.authoring = function () {
